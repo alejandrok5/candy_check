@@ -1,4 +1,4 @@
-# candy_check
+# candy_check with oath for play_store
 
 [![Gem Version](https://badge.fury.io/rb/candy_check.svg)](http://badge.fury.io/rb/candy_check)
 [![Build Status](https://travis-ci.org/jnbt/candy_check.svg?branch=master)](https://travis-ci.org/jnbt/candy_check)
@@ -38,17 +38,35 @@ your app's development.
 
 ### PlayStore
 
-Google's PlayStore has different kind of server-to-server API to check purchases and requires that you register a so
-called "[service account](https://developers.google.com/accounts/docs/OAuth2ServiceAccount)". You have to register a
-new account by yourself, export the generated certificate file and grant the correct permissions to the account for
-your app using the [Google Developer Console](https://console.developers.google.com).
+This document outlines setting up google's ruby gem, google-api-client, to verify payloads(receipts) sent to a server from google play in app purchases made via an android app.  
+This document was written using version 0.9.13.
 
-Further more this gem uses the [official Ruby SDK](https://github.com/google/google-api-ruby-client) for the API interactions
-which suggest to use a locally cached service discovery. If you don't omit the `cache_file` configuration this is done
-automatically.
+First you'll need 'owner' access to the google play developer's console that contains the mobile app you wish to verify receipts from.  
+* Go to https://play.google.com/apps/publish
+* Click on the mobile app you'd like to set up
+* Click "Settings" on the left click "API access"
+* Below "LINKED PROJECT" link the google play account
 
-If you have set up the Android app correctly you should get a [`purchaseToken`](http://developer.android.com/google/play/billing/billing_reference.html#getBuyIntent) per purchased item. You should use this string in combination with `packageName` and `productId`
-to verify the purchase.
+Next setup an api account
+* Go to http://console.developers.google.com
+* From the left menu select "Credentials"
+* From the center click "Create credentials"
+* From the drop down select "OAuth client ID"
+* From the "Application Type" list select "Web Application"
+* Note your the "client id" and "client secret"
+
+Now manually "login" with your oauth information (this video outlines the steps below  https://www.youtube.com/watch?v=hfWe1gPCnzc)
+* go to https://developers.google.com/oauthplayground/
+* Click the "cog" icon on the righ
+* Check "User your own OAuth credentials"
+* Select "Access Type" of "Offline"
+* Enter the client id and client secret created from the previos step
+* Under scopes on the left select "Google Play Developer API v2" and then 
+* click "Authorize APIs'
+* click "Allow'
+* click "Exchange authorization code for tokens'
+* note the "refresh token" and "access token"
+
 
 ## Usage
 
@@ -85,77 +103,26 @@ Please see the class documentation for [`CandyCheck::AppStore::ReceiptCollection
 
 ### PlayStore
 
-First initialize and **boot** a verifier instance for your application. This loads the API discovery and
-fetches the needed OAuth access token. When configuring a `cache_file` the discovery is loaded (or dumped) to
-this file.
-
-> **Remarks:** Both `application_name` and `application_version` represent *your* application against Google's APIs. You may use any values here, but I suggest to refelect the name of the used service account here.
-
 ```ruby
-config = CandyCheck::PlayStore::Config.new(
-  application_name: 'YourApplication',
-  application_version: '1.0',
-  issuer: 'abcdefg@developer.gserviceaccount.com',
-  key_file: 'local/google.p12',
-  key_secret: 'notasecret',
-  cache_file: 'tmp/candy_check_play_store_cache'
-)
-verifier = CandyCheck::PlayStore::Verifier.new(config)
-verifier.boot!
+    verifier = CandyCheck::PlayStore::Auth.new(
+      client_id: ENV['GOOGLE_OAUTH_CLIENT_ID'],
+      client_secret: ENV['GOOGLE_OAUTH_CLIENT_SECRET'],
+      refresh_token: ENV['GOOGLE_OAUTH_CLIENT_TOKEN'],
+      access_token: ENV['GOOGLE_OAUTH_ACCESS_TOKEN']
+    )
+    verifier.verify!(package_name, product_id, purchase_token)
 ```
 
 For the PlayStore your client should deliver the purchases token, package name and product id:
 
 ```ruby
-verifier.verify(package, product_id, token) # => Receipt or VerificationFailure
+verifier.verify!(package_name, product_id, purchase_token) # => true or false
 ```
 
-Please see the class documenations [`CandyCheck::PlayStore::Receipt`](http://www.rubydoc.info/github/jnbt/candy_check/master/CandyCheck/PlayStore/Receipt) and [`CandyCheck::PlayStore::VerificationFailure`](http://www.rubydoc.info/github/jnbt/candy_check/master/CandyCheck/PlayStore/VerificationFailure) for further details about the responses.
-
-In order to **verify a subscription** from the Play Store, do the following:
-
-```ruby
-verifier.verify_subscription(package, subscription_id, token) # => Subscription or VerificationFailure
-```
-
-Please see documenation for [`CandyCheck::PlayStore::Subscription`](http://www.rubydoc.info/github/jnbt/candy_check/master/CandyCheck/PlayStore/Subscription) for further details.
-
-## CLI
-
-This gem ships with an executable to verify in-app purchases directly from your terminal:
-
-### AppStore
-
-You only need to specify the base64 encoded receipt:
-
-```bash
-$ candy_check app_store RECEIPT_DATA
-```
-
-See all options:
-
-```bash
-$ candy_check help app_store
-```
-
-### PlayStore
-
-For the PlayStore you need to specify at least the issuer, the key file, your package name, the product and the actual
-purchase token:
-
-```bash
-$ candy_check play_store PACKAGE PRODUCT_ID TOKEN --issuer=ISSUER --key-file=KEY_FILE
-```
-
-See all options:
-
-```bash
-$ candy_check help play_store
-```
 
 
 ## Todos
-
+* better test and documentation for play_store
 * Allow using the combined StoreKit receipt data
 * Find a ways to run integration tests
 
